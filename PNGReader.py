@@ -41,19 +41,47 @@ class PNGReader:
     name = ""
 
     enc = None
+    ww = 0
 
-    #read image - most important function
-    def readPNG(self, name):
-        # assign name of the file, file handler, as well read this with cv2
+    encryption = 0
+    
+    cipheredName = None
+    decipheredName = None
+
+    bytesKeyLength = None
+
+
+    def __init__(self, name):
         self.name = name
-        self.f = open(self.name, "rb")
         self.img = cv2.imread(self.name)
 
+        self.cipheredName = "RSA" + self.name
+        self.decipheredName = "DEC" + self.name
+
         self.enc = NR()
-        
+
+        self.bytesKeyLength = self.enc.realKeyLength / 8
+        if isinstance(self.bytesKeyLength, float):
+            self.bytesKeyLength = int(self.bytesKeyLength)
+
+
+
+    #read image - most important function
+    def readPNG(self):
+        # assign name of the file, file handler, as well read this with cv2
+
+        if self.encryption == 1:
+            self.f = open(self.name, "rb")
+        elif self.encryption == -1:
+            self.f = open(self.cipheredName, "rb")        
+
         header = self.f.read(8)
 
-        fwrite = open("RSA" + self.name, "wb+")
+        if self.encryption == 1:
+            fwrite = open(self.cipheredName, "wb+")
+        elif self.encryption == -1:
+            fwrite = open(self.decipheredName, "wb+")
+            
         fwrite.write(header)
 
         #check if png
@@ -83,7 +111,12 @@ class PNGReader:
                     
                 elif int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_IDAT:
                     print("Incoming chunk's name: IDAT")
-                    self.EncryptIDAT(datalen, fwrite)
+                    if self.encryption == 1:
+                        self.EncryptIDAT(datalen, fwrite)
+                    elif self.encryption == -1:
+                        self.DecryptIdat(datalen, fwrite)
+                    else:
+                        self.readTillEnd(datalen, fwrite)
 
                 elif int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_IEND:
                     print("Incoming chunk's name: IEND")
@@ -169,27 +202,69 @@ class PNGReader:
 
     
     def EncryptIDAT(self, datalen, fwrite):
-
         readBytes = 0
+        isNotGood = 0
 
-        bytesKeyLength = self.enc.realKeyLength / 8
+        bytesKeyLength = (self.enc.realKeyLength + 7) // 8
         if isinstance(bytesKeyLength, float):
             bytesKeyLength = int(bytesKeyLength)
 
-        for _ in range(datalen):
-            if bytesKeyLength <= datalen - readBytes:
-                tmp = self.f.read(bytesKeyLength)
-                fwrite.write(self.enc.Encrypt(int.from_bytes(tmp, byteorder='big')).to_bytes(bytesKeyLength, byteorder='big'))
-                readBytes += bytesKeyLength
-            else:
-                if readBytes == 0:
-                    print(datalen - readBytes)
+        if datalen % bytesKeyLength == 0:
+            howMany = 2*(datalen // bytesKeyLength)
+        else:
+            howMany = 2*(datalen // bytesKeyLength) + 2
+            isNotGood = 1
+
+        print(howMany)
+
+        for i in range(howMany):
+            if isNotGood == 1 and i == howMany - 1: 
                 tmp = self.f.read(datalen - readBytes)
-                fwrite.write(self.enc.Encrypt(int.from_bytes(tmp, byteorder='big')).to_bytes(datalen - readBytes, byteorder='big'))
-                readBytes += (datalen - readBytes)
+                print(datalen-readBytes)
+                zz = self.enc.Encrypt(int.from_bytes(tmp, byteorder='big')).to_bytes(bytesKeyLength, byteorder='big')
+                fwrite.write(zz)
+                print(datalen % (bytesKeyLength // 2))
+                readBytes += (datalen % (bytesKeyLength // 2))
+            else:
+                tmp = self.f.read(bytesKeyLength // 2)
+                zz = self.enc.Encrypt(int.from_bytes(tmp, byteorder='big')).to_bytes(bytesKeyLength, byteorder='big')
+                fwrite.write(zz)
+                readBytes += bytesKeyLength // 2
 
         fwrite.write(self.f.read(4))
 
+
+    def DecryptIdat(self, datalen, fwrite):
+        readBytes = 0
+
+        bytesKeyLength = (self.enc.realKeyLength + 7) // 8
+
+        isNotGood = 0
+
+        if datalen % bytesKeyLength == 0:
+            howMany = 2*(datalen // bytesKeyLength)
+        else:
+            howMany = 2*(datalen // bytesKeyLength) + 2
+            isNotGood = 1
+
+
+        print(howMany)
+
+        for i in range(howMany):
+            tmp = self.f.read(bytesKeyLength)
+            zz = self.enc.Decrypt(int.from_bytes(tmp, byteorder='big'))
+            if isNotGood == 1 and i == howMany - 1: 
+                print("umcia")
+                print(datalen % (bytesKeyLength // 2))
+                fwrite.write(zz.to_bytes(datalen % (bytesKeyLength // 2) , byteorder='big'))
+                readBytes =+ datalen - bytesKeyLength
+            else:
+                fwrite.write(zz.to_bytes(bytesKeyLength//2, byteorder='big'))
+                readBytes =+ bytesKeyLength
+
+
+        fwrite.write(self.f.read(4))
+      
 
     #print it with cv2
     def printImg(self):

@@ -2,7 +2,7 @@ import sympy as sy
 
 class NaiveRSA:
 
-    keysize = 8
+    keysize = 256
     realKeyLength = None
 
     p = None

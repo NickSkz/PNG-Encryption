@@ -6,7 +6,7 @@ class PNG_GUI:
     HEIGHT = 500
     WIDTH = 950
 
-    reader = PR()
+    reader = None
 
     #Initialize Tkinter window, another buttons, stuff like that
     def __init__(self, master):
@@ -69,10 +69,12 @@ class PNG_GUI:
         self.reader.printImg()
 
     def SelfMadeNaive(self):
-        pass
+        self.reader.encryption = 1
+        self.reader.readPNG()
 
     def Decipher(self):
-        pass
+        self.reader.encryption = -1
+        self.reader.readPNG()
 
     def SelfMadeComplicated(self):
         pass
@@ -83,11 +85,8 @@ class PNG_GUI:
     def CompareCipher(self):
         pass
 
-
-
     def startProcessing(self, name):
-        self.reader.readPNG(name)
-
+        self.reader = PR(name)
 
 #go with it 
 root = Tk()
