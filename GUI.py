@@ -45,7 +45,7 @@ class PNG_GUI:
         self.displayPalette = Button(frame, text="Compare three methods", command=lambda: self.CompareCipher())
         self.displayPalette.pack(side='top', fill='both', expand='true')
 
-        self.fourierButton = Button(frame, text="Decipher", command=lambda: self.Decipher())
+        self.fourierButton = Button(frame, text="Decipher", command=lambda: self.DecipherNaive())
         self.fourierButton.pack(side='top', fill='both', expand='true')
 
 
@@ -72,7 +72,7 @@ class PNG_GUI:
         self.reader.encryption = 1
         self.reader.readPNG()
 
-    def Decipher(self):
+    def DecipherNaive(self):
         self.reader.encryption = -1
         self.reader.readPNG()
 
@@ -86,7 +86,7 @@ class PNG_GUI:
         pass
 
     def startProcessing(self, name):
-        self.reader = PR(name)
+        self.reader = PR(name) 
 
 #go with it 
 root = Tk()

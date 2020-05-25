@@ -33,12 +33,14 @@ class NaiveRSA:
             self.pub_key = (self.e, self.n)
             self.pri_key = (self.d, self.n)
 
-
+    dr = 0
     def Encrypt(self, data):
         self.encrBuff = pow(data, self.e, self.n)
+        self.dr = data
         return self.encrBuff
 
     def Decrypt(self, data):
+        self.dr = data
         self.decrBuff = pow(data, self.d, self.n)
         return self.decrBuff
 
