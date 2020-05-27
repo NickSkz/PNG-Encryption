@@ -33,23 +33,56 @@ class PNG_GUI:
         self.displayImage = Button(frame, text="Display Image", command=lambda: self.PrintImage())
         self.displayImage.pack(side='top', fill='both', expand='true')
 
-        self.displayCriticalButton = Button(frame, text="Cipher with self-made algorithm (naive)", command=lambda: self.SelfMadeNaive())
-        self.displayCriticalButton.pack(side='top', fill='both', expand='true')
 
-        self.displayAncillaryButton = Button(frame, text="Cipher with self-made algorithm (non-naive)", command=lambda: self.CipherCBC())
-        self.displayAncillaryButton.pack(side='top', fill='both', expand='true')
 
-        self.displayPalette = Button(frame, text="Cipher with algorithm from library", command=lambda: self.LibraryMade())
-        self.displayPalette.pack(side='top', fill='both', expand='true')
+        ecbFrame = Frame(frame)
+        ecbFrame.pack(side='top', fill='both', expand='true')
 
-        self.displayPalette = Button(frame, text="Compare three methods", command=lambda: self.CompareCipher())
-        self.displayPalette.pack(side='top', fill='both', expand='true')
+        self.ecbC = Button(ecbFrame, text="Cipher ECB", command=lambda: self.CipherECB())
+        self.ecbC.pack(side='left', fill='both', expand='true')
 
-        self.fourierButton = Button(frame, text="Decipher ECB", command=lambda: self.DecipherNaive())
-        self.fourierButton.pack(side='top', fill='both', expand='true')
+        self.ecbD = Button(ecbFrame, text="Decipher ECB", command=lambda: self.DecipherECB())
+        self.ecbD.pack(side='left', fill='both', expand='true')
 
-        self.fourierButton = Button(frame, text="Decipher CBC", command=lambda: self.DecipherCBC())
-        self.fourierButton.pack(side='top', fill='both', expand='true')
+
+
+        cbcFrame = Frame(frame)
+        cbcFrame.pack(side='top', fill='both', expand='true')
+
+        self.cbcC = Button(cbcFrame, text="Cipher CBC", command=lambda: self.CipherCBC())
+        self.cbcC.pack(side='left', fill='both', expand='true')
+
+        self.cbcD = Button(cbcFrame, text="Decipher CBC", command=lambda: self.DecipherCBC())
+        self.cbcD.pack(side='left', fill='both', expand='true')
+
+
+
+
+        pycryptoFrame = Frame(frame)
+        pycryptoFrame.pack(side='top', fill='both', expand='true')
+
+        self.pycryptoC = Button(pycryptoFrame, text="Cipher Pycrypto", command=lambda: self.CipherPycrypto())
+        self.pycryptoC.pack(side='left', fill='both', expand='true')
+
+        self.pycryptoD = Button(pycryptoFrame, text="Decipher Pycrypto", command=lambda: self.DecipherPycrypto())
+        self.pycryptoD.pack(side='left', fill='both', expand='true')
+
+
+
+
+        compressedFrame = Frame(frame)
+        compressedFrame.pack(side='top', fill='both', expand='true')
+
+        self.compressedC = Button(compressedFrame, text="Cipher Compressed", command=lambda: self.CipherCompressed())
+        self.compressedC.pack(side='left', fill='both', expand='true')
+
+        self.compressedD = Button(compressedFrame, text="Decipher Compressed", command=lambda: self.DecipherCompressed())
+        self.compressedD.pack(side='left', fill='both', expand='true')
+
+
+
+        self.blank = Button(frame, text="-_________-", command=lambda: self.PrintImage())
+        self.blank.pack(side='top', fill='both', expand='true')
 
 
 
@@ -72,15 +105,19 @@ class PNG_GUI:
     def PrintImage(self):
         self.reader.printImg()
 
-    def SelfMadeNaive(self):
+
+
+    def CipherECB(self):
         self.reader.encryption = 1
         self.reader.whichMethod = 0
         self.reader.readPNG()
 
-    def DecipherNaive(self):
+    def DecipherECB(self):
         self.reader.encryption = -1
         self.reader.whichMethod = 0
         self.reader.readPNG()
+
+
 
 
     def CipherCBC(self):
@@ -94,11 +131,29 @@ class PNG_GUI:
         self.reader.readPNG()
 
 
-    def LibraryMade(self):
+
+
+    def CipherPycrypto(self):
         pass
 
-    def CompareCipher(self):
+    def DecipherPycrypto(self):
         pass
+
+
+
+
+    def CipherCompressed(self):
+        self.reader.encryption = 1
+        self.reader.whichMethod = 2
+        self.reader.readPNG()
+
+    def DecipherCompressed(self):
+        self.reader.encryption = -1
+        self.reader.whichMethod = 2
+        self.reader.readPNG()
+
+
+
 
     def startProcessing(self, name):
         self.reader = PR(name) 

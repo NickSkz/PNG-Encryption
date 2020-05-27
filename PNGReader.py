@@ -46,6 +46,8 @@ class PNGReader:
     ww = 0
 
     encryption = 0
+
+    originalIDATWhatsLeft = 0
     
     cipheredName = None
     decipheredName = None
@@ -64,10 +66,6 @@ class PNGReader:
         self.decipheredName = "DEC" + self.name
 
         self.enc = RSA()
-
-        self.bytesKeyLength = self.enc.realKeyLength / 8
-        if isinstance(self.bytesKeyLength, float):
-            self.bytesKeyLength = int(self.bytesKeyLength)
 
 
 
@@ -108,10 +106,12 @@ class PNGReader:
                 #check what chunk, peform appropriate action defined in certain chunk class
                 if int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_IHDR:
                     print("Incoming chunk's name: IHDR")
-                    if self.encryption == 1:
+                    if self.encryption == 1 and self.whichMethod != 2:
                         self.headInfo.readChunk(self.f, datalen, fwrite, 2)
-                    elif self.encryption == -1:
+                    elif self.encryption == -1 and self.whichMethod != 2:
                         self.headInfo.readChunk(self.f, datalen, fwrite, 0.5)
+                    else:   
+                        self.headInfo.readChunk(self.f, datalen, fwrite, 1)
 
                 elif int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_PLTE:
                     print("Incoming chunk's name: PLTE")
@@ -121,9 +121,17 @@ class PNGReader:
                     print("Incoming chunk's name: IDAT")
 
                     if self.encryption == 1:
-                        self.encryptDecomp(datalen, fwrite)
+                        if self.whichMethod != 2:
+                            self.encryptDecomp(datalen, fwrite)
+                        else:
+                            self.EncryptIDAT(datalen, fwrite)
+
                     elif self.encryption == -1:
-                        self.decryptDecomp(datalen, fwrite)
+                        if self.whichMethod != 2:
+                            self.decryptDecomp(datalen, fwrite)
+                        else:
+                            self.DecryptIDAT(datalen, fwrite)
+
                     else:
                         self.readTillEnd(datalen, fwrite)
 
@@ -217,13 +225,11 @@ class PNGReader:
         howManyBytesBitch = 0
 
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
-        if isinstance(bytesKeyLength, float):
-            bytesKeyLength = int(bytesKeyLength)
 
-        if datalen % bytesKeyLength == 0:
+        if datalen % bytesKeyLength // 2 == 0:
             howMany = 2*(datalen // bytesKeyLength)
         else:
-            howMany = 2*(datalen // bytesKeyLength) + 2
+            howMany = 2*(datalen // bytesKeyLength) + 1 
             isNotGood = 1
 
         print(howMany)
@@ -233,11 +239,11 @@ class PNGReader:
         for i in range(howMany):
             if isNotGood == 1 and i == howMany - 1: 
                 tmp = self.f.read(datalen - readBytes)
-                print(datalen-readBytes)
+                self.IDATwhatsLeft = datalen - readBytes
                 zz = self.enc.EncryptECB(int.from_bytes(tmp, byteorder='big'))
                 thaBytes.append(zz)
                 print(datalen % (bytesKeyLength // 2))
-                readBytes += (datalen % (bytesKeyLength // 2))
+                readBytes += datalen - readBytes
             else:
                 tmp = self.f.read(bytesKeyLength // 2)
                 zz = self.enc.EncryptECB(int.from_bytes(tmp, byteorder='big'))
@@ -258,27 +264,28 @@ class PNGReader:
         fwrite.write(self.f.read(4))
 
 
-    def DecryptIdat(self, datalen, fwrite):
+    def DecryptIDAT(self, datalen, fwrite):
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
 
         isNotGood = 0
 
-        if datalen % bytesKeyLength == 0:
-            howMany = 2*(datalen // bytesKeyLength)
-        else:
-            howMany = 2*(datalen // bytesKeyLength) + 2
-            isNotGood = 1
+        howMany = (datalen // bytesKeyLength)
 
+
+
+        fwrite.write((bytesKeyLength//2 * (howMany - 1) + self.IDATwhatsLeft).to_bytes(4, byteorder='big'))
+        fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
+        
 
         for i in range(howMany):
             tmp = self.f.read(bytesKeyLength)
             zz = self.enc.DecryptECB(int.from_bytes(tmp, byteorder='big'))
-            if isNotGood == 1 and i == howMany - 1: 
-                print(datalen % (bytesKeyLength // 2))
-                fwrite.write(zz.to_bytes(datalen % (bytesKeyLength // 2) , byteorder='big'))
+            if i == howMany - 1: 
+                print(self.IDATwhatsLeft)
+                fwrite.write(zz.to_bytes(self.IDATwhatsLeft , byteorder='big'))
             else:
-                fwrite.write(zz.to_bytes(bytesKeyLength//2, byteorder='big'))
-
+                print(i)
+                fwrite.write(zz.to_bytes(bytesKeyLength // 2, byteorder='big'))
 
         fwrite.write(self.f.read(4))
       
