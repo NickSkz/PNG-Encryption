@@ -4,7 +4,7 @@ from cv2 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
-from NaiveRSA import NaiveRSA as NR
+from RSA import RSA
 
 from HeaderChunk import HeaderChunk
 
@@ -52,6 +52,7 @@ class PNGReader:
 
     bytesKeyLength = None
 
+    whichMethod = 0
 
     headInfo = HeaderChunk()
 
@@ -62,7 +63,7 @@ class PNGReader:
         self.cipheredName = "RSA" + self.name
         self.decipheredName = "DEC" + self.name
 
-        self.enc = NR()
+        self.enc = RSA()
 
         self.bytesKeyLength = self.enc.realKeyLength / 8
         if isinstance(self.bytesKeyLength, float):
@@ -73,9 +74,6 @@ class PNGReader:
     #read image - most important function
     def readPNG(self):
         # assign name of the file, file handler, as well read this with cv2
-
-        data = []
-
         if self.encryption == 1:
             self.f = open(self.name, "rb")
         elif self.encryption == -1:
@@ -236,13 +234,13 @@ class PNGReader:
             if isNotGood == 1 and i == howMany - 1: 
                 tmp = self.f.read(datalen - readBytes)
                 print(datalen-readBytes)
-                zz = self.enc.Encrypt(int.from_bytes(tmp, byteorder='big'))
+                zz = self.enc.EncryptECB(int.from_bytes(tmp, byteorder='big'))
                 thaBytes.append(zz)
                 print(datalen % (bytesKeyLength // 2))
                 readBytes += (datalen % (bytesKeyLength // 2))
             else:
                 tmp = self.f.read(bytesKeyLength // 2)
-                zz = self.enc.Encrypt(int.from_bytes(tmp, byteorder='big'))
+                zz = self.enc.EncryptECB(int.from_bytes(tmp, byteorder='big'))
                 thaBytes.append(zz)
                 readBytes += bytesKeyLength // 2
 
@@ -274,7 +272,7 @@ class PNGReader:
 
         for i in range(howMany):
             tmp = self.f.read(bytesKeyLength)
-            zz = self.enc.Decrypt(int.from_bytes(tmp, byteorder='big'))
+            zz = self.enc.DecryptECB(int.from_bytes(tmp, byteorder='big'))
             if isNotGood == 1 and i == howMany - 1: 
                 print(datalen % (bytesKeyLength // 2))
                 fwrite.write(zz.to_bytes(datalen % (bytesKeyLength // 2) , byteorder='big'))
@@ -321,14 +319,24 @@ class PNGReader:
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
-                if isWrong == 1 and i == wieViel - 1:
-                    zz = self.enc.Encrypt(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
+
+                if self.whichMethod == 0:
+                    if isWrong == 1 and i == wieViel - 1:
+                        zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
+                    else:
+                        zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big')) 
+              
+                elif self.whichMethod == 1:
+                    if isWrong == 1 and i == wieViel - 1:
+                        zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
+                    else:
+                        zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big'), i)    
                 else:
-                    zz = self.enc.Encrypt(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big')) 
+                    pass
 
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength, byteorder='big'))
                 if i == 0 and j == 0:
-                    print(self.enc.dr.bit_length())
+                    print(self.enc.dataBuff.bit_length())
                     print(self.enc.encrBuff.bit_length)   
 
         w = b''.join(ciphIDAT)
@@ -381,13 +389,24 @@ class PNGReader:
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
-                if isWrong == 1 and i == wieViel - 1:
-                    zz = self.enc.Decrypt(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
+
+                if self.whichMethod == 0:
+                    if isWrong == 1 and i == wieViel - 1:
+                        zz = self.enc.DecryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
+                    else:
+                        zz = self.enc.DecryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big')) 
+
+                elif self.whichMethod == 1:
+                    if isWrong == 1 and i == wieViel - 1:
+                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
+                    else:
+                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big'), i) 
+                   
                 else:
-                    zz = self.enc.Decrypt(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big')) 
+                    pass
 
                 if i == 0 and j == 0:
-                    print(self.enc.dr.bit_length())  
+                    print(self.enc.dataBuff.bit_length())  
                     print(self.enc.decrBuff.bit_length())   
 
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength // 2, byteorder='big'))

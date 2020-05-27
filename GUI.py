@@ -36,7 +36,7 @@ class PNG_GUI:
         self.displayCriticalButton = Button(frame, text="Cipher with self-made algorithm (naive)", command=lambda: self.SelfMadeNaive())
         self.displayCriticalButton.pack(side='top', fill='both', expand='true')
 
-        self.displayAncillaryButton = Button(frame, text="Cipher with self-made algorithm (non-naive)", command=lambda: self.SelfMadeComplicated())
+        self.displayAncillaryButton = Button(frame, text="Cipher with self-made algorithm (non-naive)", command=lambda: self.CipherCBC())
         self.displayAncillaryButton.pack(side='top', fill='both', expand='true')
 
         self.displayPalette = Button(frame, text="Cipher with algorithm from library", command=lambda: self.LibraryMade())
@@ -45,8 +45,12 @@ class PNG_GUI:
         self.displayPalette = Button(frame, text="Compare three methods", command=lambda: self.CompareCipher())
         self.displayPalette.pack(side='top', fill='both', expand='true')
 
-        self.fourierButton = Button(frame, text="Decipher", command=lambda: self.DecipherNaive())
+        self.fourierButton = Button(frame, text="Decipher ECB", command=lambda: self.DecipherNaive())
         self.fourierButton.pack(side='top', fill='both', expand='true')
+
+        self.fourierButton = Button(frame, text="Decipher CBC", command=lambda: self.DecipherCBC())
+        self.fourierButton.pack(side='top', fill='both', expand='true')
+
 
 
         #Collect user input, output to the window
@@ -70,14 +74,25 @@ class PNG_GUI:
 
     def SelfMadeNaive(self):
         self.reader.encryption = 1
+        self.reader.whichMethod = 0
         self.reader.readPNG()
 
     def DecipherNaive(self):
         self.reader.encryption = -1
+        self.reader.whichMethod = 0
         self.reader.readPNG()
 
-    def SelfMadeComplicated(self):
-        pass
+
+    def CipherCBC(self):
+        self.reader.encryption = 1
+        self.reader.whichMethod = 1
+        self.reader.readPNG()
+
+    def DecipherCBC(self):
+        self.reader.encryption = -1
+        self.reader.whichMethod = 1
+        self.reader.readPNG()
+
 
     def LibraryMade(self):
         pass

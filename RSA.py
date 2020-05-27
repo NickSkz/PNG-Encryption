@@ -1,6 +1,7 @@
 import sympy as sy
+import random
 
-class NaiveRSA:
+class RSA:
 
     keysize = 256
     realKeyLength = None
@@ -11,11 +12,14 @@ class NaiveRSA:
     fi = None
     e = None
 
+    IV = None
+
     pub_key = None
     pri_key = None
 
     encrBuff = None
     decrBuff = None
+    dataBuff = None
 
     def __init__(self):
         self.p = sy.randprime(2**(self.keysize//2 - 1), 2**(self.keysize//2))
@@ -33,16 +37,64 @@ class NaiveRSA:
             self.pub_key = (self.e, self.n)
             self.pri_key = (self.d, self.n)
 
-    dr = 0
-    def Encrypt(self, data):
+
+
+        #----------------CBC-----------------
+        self.IV = random.getrandbits(self.realKeyLength // 2)
+
+
+    def EncryptECB(self, data):
         self.encrBuff = pow(data, self.e, self.n)
-        self.dr = data
+        self.dataBuff = data
         return self.encrBuff
 
-    def Decrypt(self, data):
-        self.dr = data
+    def DecryptECB(self, data):
+        self.dataBuff = data
         self.decrBuff = pow(data, self.d, self.n)
         return self.decrBuff
+
+
+
+
+    def EncryptCBC(self, data, howMany):
+        xored = None
+        self.dataBuff = data
+
+        if howMany == 0:
+            xored = data ^ self.IV
+        else:
+            xored = data ^ self.encrBuff
+
+        self.encrBuff = pow(xored, self.e, self.n)
+        return self.encrBuff
+
+
+    def DecryptCBC(self, data, howMany):
+        xored = None
+        decrypted = pow(data, self.d, self.n)
+
+        if howMany == 0:
+            xored = decrypted ^ self.IV
+        else:
+            xored = decrypted ^ self.dataBuff
+
+        self.dataBuff = data
+
+        return xored
+
+
+
+enc = RSA()
+
+encr = enc.EncryptCBC(522, 0)
+encr2 = enc.EncryptCBC(1224, 9)
+
+print(encr)
+print(encr2)
+
+print(enc.DecryptCBC(encr, 0))
+print(enc.DecryptCBC(encr2, 9))
+
 
 
 
