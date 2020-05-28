@@ -134,10 +134,13 @@ class PNG_GUI:
 
 
     def CipherPycrypto(self):
-        pass
+        self.reader.encryption = 1
+        self.reader.whichMethod = -1
+        self.reader.readPNG()
 
     def DecipherPycrypto(self):
-        pass
+        self.reader.encryption = -1
+        self.reader.whichMethod = -1
 
 
 

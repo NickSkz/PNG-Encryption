@@ -4,7 +4,8 @@ from cv2 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
-from RSA import RSA
+from MyRSA import MyRSA as RSA
+from PyCro import PyCro 
 
 from HeaderChunk import HeaderChunk
 
@@ -43,6 +44,7 @@ class PNGReader:
     name = ""
 
     enc = None
+    pycro = None
     ww = 0
 
     encryption = 0
@@ -66,7 +68,7 @@ class PNGReader:
         self.decipheredName = "DEC" + self.name
 
         self.enc = RSA()
-
+        self.pycro = PyCro()
 
 
     #read image - most important function
@@ -121,12 +123,16 @@ class PNGReader:
                     print("Incoming chunk's name: IDAT")
 
                     if self.encryption == 1:
-                        if self.whichMethod != 2:
+                        if self.whichMethod == -1:
+                            self.encryptPyCro(datalen, fwrite)
+                        elif self.whichMethod != 2:
                             self.encryptDecomp(datalen, fwrite)
                         else:
                             self.EncryptIDAT(datalen, fwrite)
 
                     elif self.encryption == -1:
+                        if self.whichMethod == -1:
+                            self.decryptPyCro(datalen, fwrite)
                         if self.whichMethod != 2:
                             self.decryptDecomp(datalen, fwrite)
                         else:
@@ -338,8 +344,9 @@ class PNGReader:
                         zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
                     else:
                         zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big'), i)    
+
                 else:
-                    pass
+                    print("Unknown method!")
 
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength, byteorder='big'))
                 if i == 0 and j == 0:
@@ -407,10 +414,11 @@ class PNGReader:
                     if isWrong == 1 and i == wieViel - 1:
                         zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
                     else:
-                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big'), i) 
-                   
+                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big'), i)  
+
                 else:
-                    pass
+                    print("Unknown method!")
+
 
                 if i == 0 and j == 0:
                     print(self.enc.dataBuff.bit_length())  
@@ -436,6 +444,72 @@ class PNGReader:
 
 #################################################################
 #################################################################
+
+
+
+    def encryptPyCro(self, datalen, fwrite):
+        thaBytes = []
+        for _ in range(datalen):
+            thaBytes.append(self.f.read(1))
+        
+        IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
+        print(len(IDAT_Decomp))
+
+        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*3+1), dtype=int)
+
+        for i in range(self.headInfo.height):
+            for j in range(self.headInfo.width*3+1):
+                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*3+1) + j]
+
+        niceIDAT = nicerIDAT.tolist()
+        print(self.headInfo)
+
+        print(self.headInfo.height)
+
+        bytesKeyLength = 1024  // 8
+        isWrong = 0
+
+        if (self.headInfo.width*3) % bytesKeyLength == 0:
+            wieViel = 2*((self.headInfo.width*3) // bytesKeyLength)
+        else:
+            isWrong = 1
+            wieViel = 2*(self.headInfo.width*3) // bytesKeyLength + 1
+
+        print(wieViel)
+        print(isWrong)
+        ciphIDAT = []
+
+        for j in range(self.headInfo.height):
+            ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
+            for i in range(wieViel):
+                if isWrong == 1 and i == wieViel - 1:
+                    zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)])) 
+                else:
+                     zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]))    
+                
+                ciphIDAT.append(int.from_bytes(zz, byteorder='big').to_bytes(bytesKeyLength, byteorder='big'))
+
+
+        w = b''.join(ciphIDAT)
+        print(len(w))
+        ccc = zlib.compress(w)
+        print(len(ccc))
+
+        fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
+        fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
+        fwrite.write(ccc)
+        fwrite.write(self.f.read(4))
+
+
+
+
+    #Weird Errors, hard to verify (outer library used)
+    def decryptPyCro(self, datalen, fwrite):
+        pass
+
+
+
+
 
     #print it with cv2
     def printImg(self):
