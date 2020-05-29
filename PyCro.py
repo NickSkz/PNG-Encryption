@@ -10,8 +10,10 @@ class PyCro:
     public = None
     cipher = None
 
+    keyLength = 1024
+
     def __init__(self):
-        self.key = RSA.generate(1024, Random.new().read)
+        self.key = RSA.generate(self.keyLength, Random.new().read)
         self.private, self.public = self.key, self.key.publickey()
         self.cipher = PKCS1_OAEP.new(self.key)      
 
@@ -21,9 +23,9 @@ class PyCro:
     def decrypt(self, msg):
         return self.cipher.decrypt(msg)
 
-cr = PyCro()
-normal = 132512512352523582358239523958239853298589258923592389523985239582391820571234785346953427895230495
-maszyna = cr.cipher.encrypt(normal.to_bytes(64, byteorder='big'))
-
-print(maszyna)
-print(int.from_bytes(cr.cipher.decrypt(maszyna), byteorder='big'))
+#cr = PyCro()
+#normal = 132512512352523582358239523958239853298589258923592389523985239582391820571234785346953427895230495
+#maszyna = cr.cipher.encrypt(normal.to_bytes(64, byteorder='big'))
+#
+#print(maszyna)
+#print(int.from_bytes(cr.cipher.decrypt(maszyna), byteorder='big'))

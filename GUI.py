@@ -106,6 +106,8 @@ class PNG_GUI:
         self.reader.printImg()
 
 
+    #Methods connected with appropriate technique
+
 
     def CipherECB(self):
         self.reader.encryption = 1

@@ -3,9 +3,11 @@ import random
 
 class MyRSA:
 
-    keysize = 256
+    #Set keysize
+    keysize = 512
     realKeyLength = None
 
+    
     p = None
     q = None
     n = None
@@ -84,16 +86,16 @@ class MyRSA:
 
 
 
-enc = MyRSA()
-
-encr = enc.EncryptCBC(522, 0)
-encr2 = enc.EncryptCBC(1224, 9)
-
-print(encr)
-print(encr2)
-
-print(enc.DecryptCBC(encr, 0))
-print(enc.DecryptCBC(encr2, 9))
+#enc = MyRSA()
+#
+#encr = enc.EncryptCBC(522, 0)
+#encr2 = enc.EncryptCBC(1224, 9)
+#
+#print(encr)
+#print(encr2)
+#
+#print(enc.DecryptCBC(encr, 0))
+#print(enc.DecryptCBC(encr2, 9))
 
 
 

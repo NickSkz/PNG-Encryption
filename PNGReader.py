@@ -61,11 +61,13 @@ class PNGReader:
     headInfo = HeaderChunk()
 
     def __init__(self, name):
-        self.name = name
+
+        self.name = "res/" + name
+
         self.img = cv2.imread(self.name)
 
-        self.cipheredName = "RSA" + self.name
-        self.decipheredName = "DEC" + self.name
+        self.cipheredName = "results/RSA" + name
+        self.decipheredName = "results/DEC" + name
 
         self.enc = RSA()
         self.pycro = PyCro()
@@ -223,12 +225,15 @@ class PNGReader:
             tmp = self.f.read(1)
             fwrite.write(tmp)
 
+
+    ########################################################################3
+
     
     def EncryptIDAT(self, datalen, fwrite):
         readBytes = 0
         isNotGood = 0
 
-        howManyBytesBitch = 0
+        howManyBytes = 0
 
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
 
@@ -238,8 +243,6 @@ class PNGReader:
             howMany = 2*(datalen // bytesKeyLength) + 1 
             isNotGood = 1
 
-        print(howMany)
-
         thaBytes = []
 
         for i in range(howMany):
@@ -248,7 +251,6 @@ class PNGReader:
                 self.IDATwhatsLeft = datalen - readBytes
                 zz = self.enc.EncryptECB(int.from_bytes(tmp, byteorder='big'))
                 thaBytes.append(zz)
-                print(datalen % (bytesKeyLength // 2))
                 readBytes += datalen - readBytes
             else:
                 tmp = self.f.read(bytesKeyLength // 2)
@@ -256,45 +258,38 @@ class PNGReader:
                 thaBytes.append(zz)
                 readBytes += bytesKeyLength // 2
 
-            howManyBytesBitch += bytesKeyLength
+            howManyBytes += bytesKeyLength
 
-        print(howManyBytesBitch)
-        fwrite.write(howManyBytesBitch.to_bytes(4, byteorder='big'))
+        fwrite.write(howManyBytes.to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
 
         for i in thaBytes:
             fwrite.write(i.to_bytes(bytesKeyLength, byteorder='big'))
 
-        print()
 
         fwrite.write(self.f.read(4))
 
+    #################################################################################################
 
     def DecryptIDAT(self, datalen, fwrite):
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
 
-        isNotGood = 0
-
         howMany = (datalen // bytesKeyLength)
-
-
 
         fwrite.write((bytesKeyLength//2 * (howMany - 1) + self.IDATwhatsLeft).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
         
-
         for i in range(howMany):
             tmp = self.f.read(bytesKeyLength)
             zz = self.enc.DecryptECB(int.from_bytes(tmp, byteorder='big'))
             if i == howMany - 1: 
-                print(self.IDATwhatsLeft)
                 fwrite.write(zz.to_bytes(self.IDATwhatsLeft , byteorder='big'))
             else:
-                print(i)
                 fwrite.write(zz.to_bytes(bytesKeyLength // 2, byteorder='big'))
 
         fwrite.write(self.f.read(4))
       
+    #############################################################
     #############################################################
     
     def encryptDecomp(self, datalen, fwrite):
@@ -303,30 +298,25 @@ class PNGReader:
             thaBytes.append(self.f.read(1))
         
         IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
-        print(len(IDAT_Decomp))
 
-        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*3+1), dtype=int)
+        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*self.headInfo.multiplier+1), dtype=int)
 
         for i in range(self.headInfo.height):
-            for j in range(self.headInfo.width*3+1):
-                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*3+1) + j]
+            for j in range(self.headInfo.width*self.headInfo.multiplier+1):
+                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*self.headInfo.multiplier+1) + j]
 
         niceIDAT = nicerIDAT.tolist()
-        print(self.headInfo)
-
-        print(self.headInfo.height)
+        
 
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
         isWrong = 0
 
-        if (self.headInfo.width*3) % bytesKeyLength == 0:
-            wieViel = 2*((self.headInfo.width*3) // bytesKeyLength)
+        if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
+            wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength
         else:
             isWrong = 1
-            wieViel = (self.headInfo.width*3) // bytesKeyLength + 1
+            wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength  + 1
 
-        print(wieViel)
-        print(isWrong)
         ciphIDAT = []
 
         for j in range(self.headInfo.height):
@@ -335,13 +325,13 @@ class PNGReader:
 
                 if self.whichMethod == 0:
                     if isWrong == 1 and i == wieViel - 1:
-                        zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
+                        zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*self.headInfo.multiplier) + 1)]), byteorder='big')) 
                     else:
                         zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big')) 
               
                 elif self.whichMethod == 1:
                     if isWrong == 1 and i == wieViel - 1:
-                        zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
+                        zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*self.headInfo.multiplier) + 1)]), byteorder='big'), i) 
                     else:
                         zz = self.enc.EncryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]), byteorder='big'), i)    
 
@@ -349,14 +339,11 @@ class PNGReader:
                     print("Unknown method!")
 
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength, byteorder='big'))
-                if i == 0 and j == 0:
-                    print(self.enc.dataBuff.bit_length())
-                    print(self.enc.encrBuff.bit_length)   
+
 
         w = b''.join(ciphIDAT)
-        print(len(w))
         ccc = zlib.compress(w)
-        print(len(ccc))
+
 
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
@@ -374,30 +361,28 @@ class PNGReader:
             thaBytes.append(self.f.read(1))
         
         IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
-        print(len(IDAT_Decomp))
 
-        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*3+1), dtype=int)
+        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*self.headInfo.multiplier +1), dtype=int)
 
         for i in range(self.headInfo.height):
-            for j in range(self.headInfo.width*3+1):
-                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*3+1) + j]
+            for j in range(self.headInfo.width*self.headInfo.multiplier+1):
+                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*self.headInfo.multiplier+1) + j]
 
         niceIDAT = nicerIDAT.tolist()
 
-        print(self.headInfo)
-        print(self.headInfo.height)
-
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
+
         isWrong = 0
 
-        if (self.headInfo.width*3) % bytesKeyLength == 0:
-            wieViel = (self.headInfo.width*3) // bytesKeyLength
+        if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
+            wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength 
         else:
             isWrong = 1
-            wieViel = (self.headInfo.width*3) // bytesKeyLength + 1
+            wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength + 1
 
-        print(wieViel)
-        print(isWrong)
+
+        wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength 
+
         ciphIDAT = []
 
         for j in range(self.headInfo.height):
@@ -405,37 +390,21 @@ class PNGReader:
             for i in range(wieViel):
 
                 if self.whichMethod == 0:
-                    if isWrong == 1 and i == wieViel - 1:
-                        zz = self.enc.DecryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big')) 
-                    else:
-                        zz = self.enc.DecryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big')) 
+                    zz = self.enc.DecryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big')) 
 
                 elif self.whichMethod == 1:
-                    if isWrong == 1 and i == wieViel - 1:
-                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((self.headInfo.width*3) + 1)]), byteorder='big'), i) 
-                    else:
-                        zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big'), i)  
+                    zz = self.enc.DecryptCBC(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength)) : ((i+1)*bytesKeyLength + 1)]), byteorder='big'), i)  
 
                 else:
                     print("Unknown method!")
 
-
-                if i == 0 and j == 0:
-                    print(self.enc.dataBuff.bit_length())  
-                    print(self.enc.decrBuff.bit_length())   
-
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength // 2, byteorder='big'))
 
+
         w = b''.join(ciphIDAT)
-        print(len(w))
 
 
         ccc = zlib.compress(w)
-        print(len(ccc))
-
-        print(w[0])
-        print(w[1])
-        print(w[2])
         
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
@@ -453,37 +422,32 @@ class PNGReader:
             thaBytes.append(self.f.read(1))
         
         IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
-        print(len(IDAT_Decomp))
 
-        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*3+1), dtype=int)
+        nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*self.headInfo.multiplier+1), dtype=int)
 
         for i in range(self.headInfo.height):
-            for j in range(self.headInfo.width*3+1):
-                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*3+1) + j]
+            for j in range(self.headInfo.width*self.headInfo.multiplier+1):
+                nicerIDAT[i][j] = IDAT_Decomp[i*(self.headInfo.width*self.headInfo.multiplier+1) + j]
 
         niceIDAT = nicerIDAT.tolist()
-        print(self.headInfo)
 
-        print(self.headInfo.height)
 
-        bytesKeyLength = 1024  // 8
+        bytesKeyLength = PyCro.keyLength  // 8
         isWrong = 0
 
-        if (self.headInfo.width*3) % bytesKeyLength == 0:
-            wieViel = 2*((self.headInfo.width*3) // bytesKeyLength)
+        if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
+            wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength
         else:
             isWrong = 1
-            wieViel = 2*(self.headInfo.width*3) // bytesKeyLength + 1
+            wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength + 1
 
-        print(wieViel)
-        print(isWrong)
         ciphIDAT = []
 
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
                 if isWrong == 1 and i == wieViel - 1:
-                    zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*3) + 1)])) 
+                    zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*self.headInfo.multiplier) + 1)])) 
                 else:
                      zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]))    
                 
@@ -491,9 +455,7 @@ class PNGReader:
 
 
         w = b''.join(ciphIDAT)
-        print(len(w))
         ccc = zlib.compress(w)
-        print(len(ccc))
 
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))

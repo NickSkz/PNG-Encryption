@@ -8,9 +8,12 @@ class HeaderChunk:
     compressionMethod = None
     filterMethod = None
     interlaceMethod = None
+
+    multiplier = None
     
-    #read according to png documentation
+    #read according to png documentation + scale width if neccesary (key point in encryption method used)
     def readChunk(self, f, datalen, fwrite, scale):
+
         wdt = f.read(4)
         self.width = int.from_bytes(wdt, byteorder='big')
         fwrite.write(int(self.width*scale).to_bytes(4, byteorder='big'))
@@ -26,6 +29,27 @@ class HeaderChunk:
         cTp = f.read(1)
         self.colorType = int.from_bytes(cTp, byteorder='big') 
         fwrite.write(cTp)
+
+        #set multiplier thats used in encryption/decryption
+
+        if self.colorType == 0:
+            self.multiplier = 1 * (self.bitDepth // 8)
+
+        elif self.colorType == 2:
+            self.multiplier = 3 * (self.bitDepth // 8)
+
+        elif self.colorType == 3:
+            self.multiplier = 1 * (self.bitDepth // 8)
+
+        elif self.colorType == 4:
+            self.multiplier = 2 * (self.bitDepth // 8)
+
+        elif self.colorType == 6:
+            self.multiplier = 4 * (self.bitDepth // 8)
+
+        else:
+            self.multiplier = 3 * (self.bitDepth // 8)
+        
 
         cmpMth = f.read(1)
         self.compressionMethod = int.from_bytes(cmpMth, byteorder='big') 
@@ -50,6 +74,7 @@ class HeaderChunk:
             4: "Grayscale + Alpha",
             6: "Truecolor + Alpha",
         }
+
         return switcher.get(num, "Unknown value.")
 
     #what number -> interlace
