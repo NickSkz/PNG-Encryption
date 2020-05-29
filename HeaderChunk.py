@@ -30,8 +30,7 @@ class HeaderChunk:
         self.colorType = int.from_bytes(cTp, byteorder='big') 
         fwrite.write(cTp)
 
-        #set multiplier thats used in encryption/decryption
-
+        #Set multiplier thats used in encryption/decryption
         if self.colorType == 0:
             self.multiplier = 1 * (self.bitDepth // 8)
 

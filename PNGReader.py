@@ -43,39 +43,48 @@ class PNGReader:
     #name of the file
     name = ""
 
+    #Our 2 encryption objects
     enc = None
     pycro = None
-    ww = 0
 
+    # encryption flag: 1 - encryption, -1 - decrytpion
     encryption = 0
 
+    #variable used in en/decryption of compressed file
     originalIDATWhatsLeft = 0
     
+    # name of encrypted, decrypted image
     cipheredName = None
     decipheredName = None
 
+    # variable that holds real key length
     bytesKeyLength = None
 
+    # Method: ECB - 0, CBC - 1, Encrypt compressed - 2, PyCrypto - -1
     whichMethod = 0
 
+    # object connected with header metadata info
     headInfo = HeaderChunk()
 
     def __init__(self, name):
 
+        #find file in res folder
         self.name = "res/" + name
 
         self.img = cv2.imread(self.name)
 
+        # results in resluts/ folder
         self.cipheredName = "results/RSA" + name
         self.decipheredName = "results/DEC" + name
 
+        #initialize objects
         self.enc = RSA()
         self.pycro = PyCro()
 
 
     #read image - most important function
     def readPNG(self):
-        # assign name of the file, file handler, as well read this with cv2
+        # open read file according do performed operation
         if self.encryption == 1:
             self.f = open(self.name, "rb")
         elif self.encryption == -1:
@@ -83,6 +92,7 @@ class PNGReader:
 
         header = self.f.read(8)
 
+        # open file that data will be written to, according to current operation
         if self.encryption == 1:
             fwrite = open(self.cipheredName, "wb+")
         elif self.encryption == -1:
@@ -110,10 +120,15 @@ class PNGReader:
                 #check what chunk, peform appropriate action defined in certain chunk class
                 if int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_IHDR:
                     print("Incoming chunk's name: IHDR")
+                    # multiply width (write to metadata) if the file that we are writing to is encrypted file
                     if self.encryption == 1 and self.whichMethod != 2:
                         self.headInfo.readChunk(self.f, datalen, fwrite, 2)
+
+                    # divide by 2 if we are reading encrypted file and we writing to decrypted.
                     elif self.encryption == -1 and self.whichMethod != 2:
                         self.headInfo.readChunk(self.f, datalen, fwrite, 0.5)
+                    
+                    # else: do not change metadata
                     else:   
                         self.headInfo.readChunk(self.f, datalen, fwrite, 1)
 
@@ -124,6 +139,7 @@ class PNGReader:
                 elif int.from_bytes(chunkType, byteorder='big') == HexTypes.PNG_IDAT:
                     print("Incoming chunk's name: IDAT")
 
+                    # preform appriopriate encryption/decryption according to flags
                     if self.encryption == 1:
                         if self.whichMethod == -1:
                             self.encryptPyCro(datalen, fwrite)
@@ -225,27 +241,39 @@ class PNGReader:
             tmp = self.f.read(1)
             fwrite.write(tmp)
 
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
 
-    ########################################################################3
-
-    
+    ########################################################################
+    # ENCRYPT COMPRESSED IDAT                                              #
+    ########################################################################
     def EncryptIDAT(self, datalen, fwrite):
+        # variable used in counting read bytes of IDAT
         readBytes = 0
+        # flag that signalizes whether we can divide IDAT into desired pieces, without problems
         isNotGood = 0
 
+        # variable that helps to adjust IDAT new size
         howManyBytes = 0
 
+        # get byte lenght of key
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
 
+        # check if division of the file will be nice - tell how many times the loop will go
         if datalen % bytesKeyLength // 2 == 0:
             howMany = 2*(datalen // bytesKeyLength)
         else:
             howMany = 2*(datalen // bytesKeyLength) + 1 
             isNotGood = 1
 
+        # Encrypted bytes list
         thaBytes = []
 
+
+        # main action - get byte series, with length = bytesKeyLength //2, convert to int, encrypt, put into list 
         for i in range(howMany):
+            # if i = howMany - 1 and we cannot divide without problems, adjust read bytes
             if isNotGood == 1 and i == howMany - 1: 
                 tmp = self.f.read(datalen - readBytes)
                 self.IDATwhatsLeft = datalen - readBytes
@@ -260,25 +288,35 @@ class PNGReader:
 
             howManyBytes += bytesKeyLength
 
+        # write new IDAT length and name
         fwrite.write(howManyBytes.to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
 
+        # write encrypted bytes, after converting back to bytes
         for i in thaBytes:
             fwrite.write(i.to_bytes(bytesKeyLength, byteorder='big'))
 
 
+        # crc
         fwrite.write(self.f.read(4))
 
-    #################################################################################################
-
+    ########################################################################
+    # DECRYPT COMPRESSED IDAT                                              #
+    ########################################################################
     def DecryptIDAT(self, datalen, fwrite):
+        # length of key in bytes
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
 
+        # how many times loop goes
         howMany = (datalen // bytesKeyLength)
 
+
+        # write to decrypted files, length of IDAT
         fwrite.write((bytesKeyLength//2 * (howMany - 1) + self.IDATwhatsLeft).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
         
+
+        # go throught idat, decrypt bytes series, and write them to file
         for i in range(howMany):
             tmp = self.f.read(bytesKeyLength)
             zz = self.enc.DecryptECB(int.from_bytes(tmp, byteorder='big'))
@@ -289,16 +327,23 @@ class PNGReader:
 
         fwrite.write(self.f.read(4))
       
-    #############################################################
-    #############################################################
-    
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
+
+    ########################################################################
+    # ENCRYPT DECOMPRESSED IDAT                                            #
+    ########################################################################
     def encryptDecomp(self, datalen, fwrite):
+        # read compressed bytes
         thaBytes = []
         for _ in range(datalen):
             thaBytes.append(self.f.read(1))
         
+        # decompress em
         IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
 
+        # organize bytes in matrix = hegiht x width(times multiplier = color type)
         nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*self.headInfo.multiplier+1), dtype=int)
 
         for i in range(self.headInfo.height):
@@ -308,9 +353,11 @@ class PNGReader:
         niceIDAT = nicerIDAT.tolist()
         
 
+        # byte size of the key
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
         isWrong = 0
 
+        # adjust loop size, to the condition wheter we can divide image into nice pieces or not
         if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
             wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength
         else:
@@ -319,10 +366,11 @@ class PNGReader:
 
         ciphIDAT = []
 
+        # add filter number, analize particular row
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
-
+                # according to given method decrypt byte series converted to int
                 if self.whichMethod == 0:
                     if isWrong == 1 and i == wieViel - 1:
                         zz = self.enc.EncryptECB(int.from_bytes(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((self.headInfo.width*self.headInfo.multiplier) + 1)]), byteorder='big')) 
@@ -337,14 +385,15 @@ class PNGReader:
 
                 else:
                     print("Unknown method!")
-
+                
+                # put resutls in the list
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength, byteorder='big'))
 
-
+        # join list and compress it
         w = b''.join(ciphIDAT)
         ccc = zlib.compress(w)
 
-
+        # write everythang to encrypted file
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
         fwrite.write(ccc)
@@ -352,16 +401,19 @@ class PNGReader:
 
 
 
-#############################################################
-#############################################################
-    
+    ########################################################################
+    # DECRYPT DECOMPRESSED IDAT                                            #
+    ########################################################################
     def decryptDecomp(self, datalen, fwrite):
+        # read bytes and decompress em
         thaBytes = []
         for _ in range(datalen):
             thaBytes.append(self.f.read(1))
         
         IDAT_Decomp = zlib.decompress(b''.join(thaBytes))
 
+
+        # organize bytes into nice matric
         nicerIDAT = np.zeros((self.headInfo.height, self.headInfo.width*self.headInfo.multiplier +1), dtype=int)
 
         for i in range(self.headInfo.height):
@@ -370,21 +422,14 @@ class PNGReader:
 
         niceIDAT = nicerIDAT.tolist()
 
+        # get key length in bytes, set loop size
         bytesKeyLength = (self.enc.realKeyLength + 7) // 8
-
-        isWrong = 0
-
-        if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
-            wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength 
-        else:
-            isWrong = 1
-            wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength + 1
-
 
         wieViel = (self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength 
 
         ciphIDAT = []
 
+        # put filter type, according to method decrypt bytes
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
@@ -397,26 +442,31 @@ class PNGReader:
 
                 else:
                     print("Unknown method!")
-
+                
+                # put everyting to the list
                 ciphIDAT.append(zz.to_bytes(bytesKeyLength // 2, byteorder='big'))
 
 
+
+        # join and compress
         w = b''.join(ciphIDAT)
-
-
         ccc = zlib.compress(w)
         
+        # write everyting
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
         fwrite.write(ccc)
         fwrite.write(self.f.read(4))
 
-#################################################################
-#################################################################
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
+#***********************************************************************************************************************************#
 
-
-
+    ########################################################################
+    # ENCRYPT USING LIBRARY                                                #
+    ########################################################################
     def encryptPyCro(self, datalen, fwrite):
+        # like always decompress everyting, orginize into nice matrix, get keylenght in bytes
         thaBytes = []
         for _ in range(datalen):
             thaBytes.append(self.f.read(1))
@@ -435,6 +485,8 @@ class PNGReader:
         bytesKeyLength = PyCro.keyLength  // 8
         isWrong = 0
 
+
+        # check if we can divide it nicely, (we divide into blocks keysize / 2)
         if (self.headInfo.width*self.headInfo.multiplier) % (bytesKeyLength//2) == 0:
             wieViel = 2*(self.headInfo.width*self.headInfo.multiplier) // bytesKeyLength
         else:
@@ -443,6 +495,7 @@ class PNGReader:
 
         ciphIDAT = []
 
+        # put filter type, analize row, encrypt with library encryptions
         for j in range(self.headInfo.height):
             ciphIDAT.append(int(niceIDAT[j][0]).to_bytes(1, byteorder='big'))
             for i in range(wieViel):
@@ -451,12 +504,14 @@ class PNGReader:
                 else:
                      zz = self.pycro.encrypt(bytearray(niceIDAT[j][(1 + (i * bytesKeyLength // 2)) : ((i+1)*bytesKeyLength // 2 + 1)]))    
                 
+                # put everyting to lthe ist
                 ciphIDAT.append(int.from_bytes(zz, byteorder='big').to_bytes(bytesKeyLength, byteorder='big'))
 
-
+        # join and compress it
         w = b''.join(ciphIDAT)
         ccc = zlib.compress(w)
 
+        # write everything to file
         fwrite.write(len(ccc).to_bytes(4, byteorder='big'))
         fwrite.write(HexTypes.PNG_IDAT.to_bytes(4, byteorder='big'))
         fwrite.write(ccc)
@@ -468,7 +523,6 @@ class PNGReader:
     #Weird Errors, hard to verify (outer library used)
     def decryptPyCro(self, datalen, fwrite):
         pass
-
 
 
 

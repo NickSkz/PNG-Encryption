@@ -4,37 +4,52 @@ import random
 class MyRSA:
 
     #Set keysize
-    keysize = 512
+    keysize = 1024
     realKeyLength = None
 
-    
+    # 2 large primary nr
     p = None
     q = None
-    n = None
-    fi = None
-    e = None
 
+    # n = pq
+    n = None
+
+    # Funkcja Eulera
+    fi = None
+
+    # e, d - key points in en/decryption
+    e = None
+    d = None
+    # Init vector in CBC
     IV = None
 
+    # public and private key
     pub_key = None
     pri_key = None
 
+    # buffers that hold info
     encrBuff = None
     decrBuff = None
     dataBuff = None
 
     def __init__(self):
+
+        #p, q - random primes in given interval, so thet multiplication gives desired key length
         self.p = sy.randprime(2**(self.keysize//2 - 1), 2**(self.keysize//2))
         self.q = sy.randprime(self.p + 1, 2**(self.keysize//2))
         self.n = self.p * self.q
 
+        # key length - to confirmation
         self.realKeyLength = int.bit_length(self.n)    
 
+        # eurler fun - then pick prime e from the interval
         self.fi = (self.p - 1) * (self.q - 1)
         self.e = sy.randprime(2, self.n)
 
+        # get d, used to decryption
         self.d = sy.mod_inverse(self.e, self.fi)
 
+        # set public and private key
         if self.n and self.e and self.d == None:
             self.pub_key = (self.e, self.n)
             self.pri_key = (self.d, self.n)
@@ -45,6 +60,7 @@ class MyRSA:
         self.IV = random.getrandbits(self.realKeyLength // 2)
 
 
+    # encrypt, decrypt ECB according to RSA (modulo exponentation)
     def EncryptECB(self, data):
         self.encrBuff = pow(data, self.e, self.n)
         self.dataBuff = data
@@ -57,7 +73,7 @@ class MyRSA:
 
 
 
-
+    #encrypt, decrypt CBC, xor with previous result,  IV - init vector 
     def EncryptCBC(self, data, howMany):
         xored = None
         self.dataBuff = data

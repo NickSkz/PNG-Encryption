@@ -5,6 +5,7 @@ from base64 import b64decode,b64encode
 
 class PyCro:
 
+    #variable used to encryption
     key = None
     private = None
     public = None
@@ -13,10 +14,12 @@ class PyCro:
     keyLength = 1024
 
     def __init__(self):
+        # generate key, get private, public, get cipher object
         self.key = RSA.generate(self.keyLength, Random.new().read)
         self.private, self.public = self.key, self.key.publickey()
         self.cipher = PKCS1_OAEP.new(self.key)      
 
+    #encyrpt/ decrypt
     def encrypt(self, msg):
         return self.cipher.encrypt(msg)
 
